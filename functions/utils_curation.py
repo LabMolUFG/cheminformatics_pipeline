@@ -8,6 +8,7 @@ from rdkit.Chem import inchi as rd_inchi
 import pandas as pd
 import statistics as st
 import warnings; warnings.simplefilter('ignore')
+import csv
 import math
 
 
@@ -16,11 +17,6 @@ errorverbose = './data/removed_during_curation/'
 
 #save tables
 save_data = "./data/curated_data/"
-
-
-#summary
-standardiseLoc = 'standardise_summary.csv'
-
 
 def check_extention(fname, step, encode = 'latin-1'):
     """ check the file extention and convert to ROMol if necessary """
@@ -97,7 +93,7 @@ def salt_remover(mol):
     return stripped
 
 #remove salts
-def removeSalts(data, errorverbose):
+def removeSalts(data):
     wrongSmiles = []
     new_smiles = []
     indexDropList_salts = []
@@ -123,14 +119,11 @@ def removeSalts(data, errorverbose):
         mask.to_csv("{}invalid_smiles.csv".format(errorverbose), sep=',', header=True, index=False)
         
     data["SMILES_no_salts"] = new_smiles
-    data = data.reset_index()
-    data = data.drop(columns = 'index')
-
-
+    data = data.reset_index(drop = True)
     return data
 
 #remove organometallics
-def remove_metal(data, errorverbose):
+def remove_metal(data):
     organometals = []
     indexDropList_org = []
     for index, smile in enumerate(data['SMILES_no_salts']):
@@ -147,12 +140,11 @@ def remove_metal(data, errorverbose):
         organmetal = pd.concat(organometals)
         organmetal.to_csv("{}organometallics.csv".format(errorverbose), sep=',', header=True, index=False)
 
-    data = data.reset_index()
-    data = data.drop(columns = 'index')
+    data = data.reset_index(drop = True)
     return data
 
 #remove mixtures
-def remove_mixture(data, errorverbose):
+def remove_mixture(data):
     mixtureList = []
     indexDropList_mix = []
     for index, smile in enumerate (data['SMILES_no_salts']):
@@ -161,11 +153,8 @@ def remove_mixture(data, errorverbose):
                 mixtureList.append(data.iloc[[index]])
                 indexDropList_mix.append(index)
                 break
-
-
     if len(indexDropList_mix) == 0:
         pass
-
     else:
         #drop mixtures
         data = data.drop(data.index[indexDropList_mix])
@@ -173,11 +162,10 @@ def remove_mixture(data, errorverbose):
         mixtures = pd.concat(mixtureList)
         mixtures.to_csv("{}mixtures.csv".format(errorverbose), sep=',', header=True, index=False)
 
-    data = data.reset_index()
-    data = data.drop(columns = 'index')
+    data = data.reset_index(drop = True)
     return data
 
-def standardise(data, errorverbose):
+def standardise(data):
     """
         -Standardize unknown stereochemistry (Handled by the RDKit Mol file parser)
             Fix wiggly bonds on sp3 carbons - sets atoms and bonds marked as unknown stereo to no stereo
@@ -242,17 +230,16 @@ def standardise(data, errorverbose):
         mask = data.iloc[indexDropList_salts]
         mask.to_csv("{}invalid_smiles_afterstd_2.csv".format(errorverbose), sep=',', header=True, index=False)
 
-        data = data.reset_index()
-        data = data.drop(columns = 'index')
+        data = data.reset_index(drop = True)
 
     data["SMILES_salts_removed_1"] = new_smiles
 
-    datasuma = pd.read_csv(f'./data/data_summary/{standardiseLoc}')
-    new_row = ['wrongs smiles removed second time', int(datasuma['value'][12])-len(data)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    new_row = ['total', len(data)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    datasuma.to_csv(f'./data/data_summary/{standardiseLoc}', index=False)
+
+    #data summary
+    row = ['after wrongs smiles removed second time', len(data)]
+    with open('./data/data_summary/preparation_summary.csv','a') as f:
+        writer = csv.writer(f)
+        writer.writerow(row)
 
     #remove radicals and standalone salts
     mols_noradical = []
@@ -276,16 +263,14 @@ def standardise(data, errorverbose):
         salts = pd.concat(standAlone_salts)
         salts.to_csv("{}salts.csv".format(errorverbose), sep=',', header=True, index=False)
     data['removed_radicals_smile'] = mols_noradical
-    data = data.reset_index()
-    data = data.drop(columns = 'index')
+    data = data.reset_index(drop = True)
 
 
-    datasuma = pd.read_csv(f'./data/data_summary/{standardiseLoc}')
-    new_row = ['standalone salts removed', int(datasuma['value'][14])-len(data)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    new_row = ['total', len(data)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    datasuma.to_csv(f'./data/data_summary/{standardiseLoc}', index=False)
+    #data summary
+    row = ['after standalone salts removed', len(data)]
+    with open('./data/data_summary/preparation_summary.csv','a') as f:
+        writer = csv.writer(f)
+        writer.writerow(row)
 
     #remove salts second time
     wrongSmiles = []
@@ -314,16 +299,14 @@ def standardise(data, errorverbose):
         mask = data.iloc[indexDropList_salts]
         mask.to_csv("{}invalid_smiles_afterstd_3.csv".format(errorverbose), sep=',', header=True, index=False)
     data["SMILES_salts_removed_2"] = new_smiles
-    data = data.reset_index()
-    data = data.drop(columns = 'index')
+    data = data.reset_index(drop = True)
 
 
-    datasuma = pd.read_csv(f'./data/data_summary/{standardiseLoc}')
-    new_row = ['wrong smiles removed third time', int(datasuma['value'][16])-len(data)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    new_row = ['total', len(data)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    datasuma.to_csv(f'./data/data_summary/{standardiseLoc}', index=False)
+    #data summary
+    row = ['after wrong smiles removed third time', len(data)]
+    with open('./data/data_summary/preparation_summary.csv','a') as f:
+        writer = csv.writer(f)
+        writer.writerow(row)
 
     #remove mixture second time
     mixtureList = []
@@ -334,7 +317,6 @@ def standardise(data, errorverbose):
                 mixtureList.append(data.iloc[[index]])
                 indexDropList_mix.append(index)
                 break
-
                 
     if len(indexDropList_mix) == 0:
         pass
@@ -347,13 +329,12 @@ def standardise(data, errorverbose):
         mixtures.to_csv("{}mixture_afterstd_2.csv".format(errorverbose), sep=',', header=True, index=False)
         data = data.reset_index()
         data = data.drop(columns = 'index')
-    
-    datasuma = pd.read_csv(f'./data/data_summary/{standardiseLoc}')
-    new_row = ['mixtures removed second time', int(datasuma['value'][18])-len(data)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    new_row = ['total', len(data)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    datasuma.to_csv(f'./data/data_summary/{standardiseLoc}', index=False)
+
+    #data summary
+    row = ['after mixtures removed second time', len(data)]
+    with open('./data/data_summary/preparation_summary.csv','a') as f:
+        writer = csv.writer(f)
+        writer.writerow(row)
 
     #final std
     rdMol = [Chem.MolFromSmiles(smile, sanitize=True) for smile in data['SMILES_salts_removed_2']]
@@ -366,17 +347,15 @@ def standardise(data, errorverbose):
 
     mol2smiles = [Chem.MolToSmiles(m) for m in molFromMolBlock]
     
-
     #remove unwanted columns
     dropList = ['SMILES', 'SMILES_no_stereo', 'SMILES_no_salts', 'Stand_smiles', 'SMILES_salts_removed_1', 'removed_radicals_smile', 'SMILES_salts_removed_2']
     data = data.drop(columns = dropList)
     data['SMILES'] = mol2smiles
-    data = data.reset_index()
-    data = data.drop(columns = 'index')
+    data = data.reset_index(drop = True)
     return data
 
 
-def curate(data,errorverbose, save_data):
+def curate(data, save_data):
 
     print("preparing smiles...")
     smiles = [smiles_preparator(str(smile)) for smile in data['SMILES']]
@@ -384,41 +363,37 @@ def curate(data,errorverbose, save_data):
     clear_output(wait=True)
 
     print("removing salts...")
-    data = removeSalts(data, errorverbose)
+    data = removeSalts(data)
     clear_output(wait=True)
 
-    datasuma = pd.read_csv(f'./data/data_summary/{standardiseLoc}')
-    new_row = ['wrong smiles removed', int(datasuma['value'][6])-len(data)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    new_row = ['total', len(data)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    datasuma.to_csv(f'./data/data_summary/{standardiseLoc}', index=False)
+    #data summary
+    row = ['after wrong smiles removed', len(data)]
+    with open('./data/data_summary/preparation_summary.csv','a') as f:
+        writer = csv.writer(f)
+        writer.writerow(row)
 
     print("removing organometallics...")
-    data = remove_metal(data, errorverbose)
+    data = remove_metal(data)
     clear_output(wait=True)
 
-    datasuma = pd.read_csv(f'./data/data_summary/{standardiseLoc}')
-    new_row = ['organometalics removed', int(datasuma['value'][8])-len(data)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    new_row = ['total', len(data)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    datasuma.to_csv(f'./data/data_summary/{standardiseLoc}', index=False)
+    #data summary
+    row = ['after organometalics removed', len(data)]
+    with open('./data/data_summary/preparation_summary.csv','a') as f:
+        writer = csv.writer(f)
+        writer.writerow(row)
 
     print("removing mixtures...")
-    data = remove_mixture(data, errorverbose)
+    data = remove_mixture(data)
     clear_output(wait=True)
 
-
-    datasuma = pd.read_csv(f'./data/data_summary/{standardiseLoc}')
-    new_row = ['mixtures removed', int(datasuma['value'][10])-len(data)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    new_row = ['total', len(data)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    datasuma.to_csv(f'./data/data_summary/{standardiseLoc}', index=False)
+    #data summary
+    row = ['after mixtures removed', len(data)]
+    with open('./data/data_summary/preparation_summary.csv','a') as f:
+        writer = csv.writer(f)
+        writer.writerow(row)
 
     print("standardising...")
-    data = standardise(data, errorverbose)
+    data = standardise(data)
     clear_output(wait=True)
 
     data.to_csv(f'{save_data}standardised_but_no_duplicates_removed.csv', header=True, index=False)
@@ -450,7 +425,7 @@ def group (dataset, aggregate_column):
     firstconcat = firstconcat.drop(columns = 'InchiKey')
     return firstconcat
 
-def dupRemovalClassification(dataset, errorverbose, columnname, curationtype):
+def dupRemovalClassification(dataset, columnname, curationtype):
     """ Removes duplicates with standard deviation > 0 """
 
     #calculate std
@@ -473,10 +448,7 @@ def dupRemovalClassification(dataset, errorverbose, columnname, curationtype):
         dataset = dataset.drop(discordant_index, errors="ignore")
         mask.to_csv("{}discordant_dup_{}.csv".format(errorverbose, curationtype), sep=',', header=True, index=False)
 
-    dataset = dataset.reset_index()
-    dataset = dataset.drop(columns = 'index')
-
-    return dataset
+    return dataset.reset_index(drop = True)
 
 
 def removeListedValues (dataset):
@@ -532,7 +504,7 @@ def dupRemovalRegression(dataset, errorverbose, columnname, threshold):
     return dataset
 
 
-def relationTreat(dataset, relationcolumn, activitycolumn, threshold, curationtype, errorverbose, summary):
+def relationTreat(dataset, relationcolumn, activitycolumn, threshold, curationtype):
     """ This functions treats relations with  > and < activities """
 
 
@@ -588,17 +560,25 @@ def relationTreat(dataset, relationcolumn, activitycolumn, threshold, curationty
         pass
 
 
-    datasuma = pd.read_csv(f'./data/data_summary/{summary}')
-    new_row = ['values with relation =', len(equal_dataset)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    new_row = ['values with relation >', len(greater_dataset)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    new_row = ['values with relation <', len(lower_dataset)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    new_row = ['values with relation <= or >= removed', len(other_relations)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    datasuma.to_csv(f'./data/data_summary/{summary}', index=False)
-    
+    # summary
+    row = ["values with relation =", len(equal_dataset)]
+    with open(f'./data/data_summary/{curationtype}_dupremoval.csv','a') as f:
+        writer = csv.writer(f)
+        writer.writerow(row)
+    row = ["values with relation >", len(greater_dataset)]
+    with open(f'./data/data_summary/{curationtype}_dupremoval.csv','a') as f:
+        writer = csv.writer(f)
+        writer.writerow(row)
+
+    row = ["values with relation >", len(lower_dataset)]
+    with open(f'./data/data_summary/{curationtype}_dupremoval.csv','a') as f:
+        writer = csv.writer(f)
+        writer.writerow(row)
+
+    row = ["values with relation <= or >= removed", len(other_relations)]
+    with open(f'./data/data_summary/{curationtype}_dupremoval.csv','a') as f:
+        writer = csv.writer(f)
+        writer.writerow(row)
 
     removeActivityGreater = []
     remainGreater = []
@@ -640,30 +620,26 @@ def relationTreat(dataset, relationcolumn, activitycolumn, threshold, curationty
     else:
         pass
 
-
     if len(remainLower) > 0:
         remainLower = lower_dataset.iloc[remainLower]
     else:
         pass
-
 
     #concat ramain datasets
     concatList = [equal_dataset, remainGreater, remainLower]
     concatList = [i  for i in concatList if len(i) > 0]
     finalDataset = pd.concat(concatList).reset_index()
     finalDataset = finalDataset.drop(columns = 'index')
-    finalDataset = finalDataset.reset_index()
-    finalDataset = finalDataset.drop(columns = 'index')
+    finalDataset = finalDataset.reset_index(drop=True)
 
-
-
-    datasuma = pd.read_csv(f'./data/data_summary/{summary}')
-    new_row = ['values with relation > removed', len(removeActivityGreater)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    new_row = ['values with relation < removed', len(removeActivitylower)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    new_row = ['total', len(finalDataset)]
-    datasuma.loc[len(datasuma.index)] = new_row
-    datasuma.to_csv(f'./data/data_summary/{summary}', index=False)
+    #summary
+    row = ["values with relation > removed", len(removeActivityGreater)]
+    with open(f'./data/data_summary/{curationtype}_dupremoval.csv','a') as f:
+        writer = csv.writer(f)
+        writer.writerow(row)
+    row = ["values with relation < removed", len(removeActivitylower)]
+    with open(f'./data/data_summary/{curationtype}_dupremoval.csv','a') as f:
+        writer = csv.writer(f)
+        writer.writerow(row)
 
     return finalDataset
